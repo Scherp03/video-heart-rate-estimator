@@ -56,8 +56,10 @@ def main():
     ]
 
     while True:
-        ret, frame = cap.read()
+        ret, initial_frame = cap.read()
         if not ret: break
+
+        frame = cv2.flip(initial_frame, 1)
 
         # KEYBOARD CONTROLS
         key = cv2.waitKey(1) & 0xFF
