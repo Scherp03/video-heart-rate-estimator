@@ -9,8 +9,8 @@ class State:
 
 # FUNCTION FOR DISPLAYING MENU 
 def display_menu(frame, lines):
-    x0, y0 = 20, 50 # starting position
-    dy = 40  # vertical spacing between lines
+    x0, y0 = 20, 50 # Starting position
+    dy = 40  # Vertical spacing between lines
     for i, line in enumerate(lines):
         temp_y = y0 + i * dy
         cv2.putText(frame, line, (x0, temp_y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
@@ -70,7 +70,7 @@ def main():
 
         elif key == ord('d'): # DETECT STATE
             current_state = State.DETECT
-            # processor = await HeartRateEstimator(buffer_size=150) 
+
             print("State: DETECT")
 
         elif key == ord('b'): # MEASURE STATE
@@ -78,7 +78,7 @@ def main():
                 print("Error: Must detect face first! Press 'd'.")
             else:
                 current_state = State.MEASURE
-                # processor.reset_buffer() 
+
                 print("State: MEASURE")
 
         elif key == ord('q'): # QUIT
@@ -107,7 +107,7 @@ def main():
                 if current_state == State.MEASURE:                    
                     # Estimate BPM ?
 
-                    # cv2.putText(frame, bpm_display, (x, y-15), 
+                    # cv2.putText(frame, bpm_display, (x, y), 
                     #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                     pass
                 
