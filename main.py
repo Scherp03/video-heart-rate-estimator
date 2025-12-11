@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import detection as dt
 
 # STATES 
 class State:
@@ -21,13 +22,13 @@ def main():
     cap = cv2.VideoCapture(0)
 
     # Face Detector and Estimator Initialization ?
-    
+    detector = dt.ForeheadDetector()
     
     # Start in IDLE state
     current_state = State.IDLE
     
     print("Controls:")
-    print(" [d] - Start/Restart Face Detection")
+    print(" [d] - Start/Restart Forehead Detection")
     print(" [b] - Start/Restart BPM Estimation")
     print(" [n] - Return to idle state (NULL)")
     print(" [q] - Quit")
@@ -42,7 +43,7 @@ def main():
     menu_detect = [
         "DETECTING FACE...",
         " - Press 'b' to start bpm measurement",
-        " - Press 'd' to restart face detection",
+        " - Press 'd' to restart Forehead detection",
         " - Press 'n' to resturn to idle state",
         " - Press 'q' to quit"
     ]
@@ -50,7 +51,7 @@ def main():
     menu_measure = [
         "MEASURING HEARTBEAT...",
         " - Press 'b' to restart bpm measurement",
-        " - Press 'd' to restart face detection",
+        " - Press 'd' to restart Forehead detection",
         " - Press 'n' to resturn to idle state",
         " - Press 'q' to quit"
     ]
@@ -75,7 +76,7 @@ def main():
 
         elif key == ord('b'): # MEASURE STATE
             if current_state == State.IDLE:
-                print("Error: Must detect face first! Press 'd'.")
+                print("Error: Must detect forehead first! Press 'd'.")
             else:
                 current_state = State.MEASURE
 
@@ -100,11 +101,25 @@ def main():
             else:
                 display_menu(frame, menu_detect)
 
-            # run the face detection ?
+            # run the face detection and forehead extraction
+            detector.detect_face(frame)
+            # optionally draw the face mesh
+            # detector.draw_face_mesh(frame)
 
+            # get forehead coordinates and draw rectangle
+            forehead_coords = detector.get_forehead_coords(frame)
+            if forehead_coords:     
+                cv2.rectangle(frame, forehead_coords[0], forehead_coords[1], (0, 255, 0), 2)
             
                 # MEASURE STATE 
-                if current_state == State.MEASURE:                    
+                if current_state == State.MEASURE: 
+                    # extract roi signal
+                    roi_values = dt.extract_roi_values(frame, forehead_coords)
+                    if roi_values is not None:
+                        mean_r, mean_g, mean_b = roi_values
+                        # Print for debugging
+                        print(f"Mean R: {mean_r}, Mean G: {mean_g}, Mean B: {mean_b}")
+
                     # Estimate BPM ?
 
                     # cv2.putText(frame, bpm_display, (x, y), 

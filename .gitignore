@@ -1,2 +1,10 @@
 .venv/
 venv/
+__pycache__
+
+
+# DNN
+.venv_dnn/
+/models/
+detection_dnn.py
+requirements_dnn.txt
