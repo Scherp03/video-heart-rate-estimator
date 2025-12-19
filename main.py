@@ -106,19 +106,22 @@ def main():
             # optionally draw the face mesh
             # detector.draw_face_mesh(frame)
 
-            # get forehead coordinates and draw rectangle
-            forehead_coords = detector.get_forehead_coords(frame)
-            if forehead_coords:     
-                cv2.rectangle(frame, forehead_coords[0], forehead_coords[1], (0, 255, 0), 2)
-            
+            # get forehead region points 
+            forehead_points = detector.get_forhead_coords(frame)
+
+            if forehead_points is not None:
+                # draw the forehead polygon
+                cv2.polylines(frame, [forehead_points], isClosed=True, color=(0, 255, 0), thickness=2)
+
                 # MEASURE STATE 
                 if current_state == State.MEASURE: 
-                    # extract roi signal
-                    roi_values = dt.extract_roi_values(frame, forehead_coords)
-                    if roi_values is not None:
-                        mean_r, mean_g, mean_b = roi_values
+                    # extract roi signal means
+                    roi_means = dt.extract_roi_means(frame, forehead_points)
+                
+                    if roi_means is not None:
+                        mean_r, mean_g, mean_b = roi_means
                         # Print for debugging
-                        print(f"Mean R: {mean_r}, Mean G: {mean_g}, Mean B: {mean_b}")
+                        print(f"POLY:\n\tMean R: {mean_r}, Mean G: {mean_g}, Mean B: {mean_b}")
 
                     # Estimate BPM ?
 
