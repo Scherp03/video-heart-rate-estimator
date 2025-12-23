@@ -1,6 +1,8 @@
+import time
 import cv2
 import numpy as np
 import detection as dt
+import ica
 
 # STATES 
 class State:
@@ -61,6 +63,9 @@ def main():
         " - Press 'q' to quit"
     ]
 
+    # ICA Estimator
+    ica_estimator = ica.Estimator(time.time())
+
     while True:
         ret, initial_frame = cap.read()
         if not ret: break
@@ -99,7 +104,14 @@ def main():
                 print("State: MEASURE")
 
         elif key == ord('q'): # QUIT
-            break
+            if ica_estimator.captures:
+                for i, capture in enumerate(ica_estimator.captures):
+                    if i == 0:
+                        print(f"Frame {i}: {capture.time:.3f}s (first frame)")
+                    else:
+                        time_diff = capture.time - ica_estimator.captures[i-1].time
+                        print(f"Frame {i}: {capture.time:.3f}s (diff: {time_diff:.3f}s)")
+                break
 
         # --- STATE MACHINE ---
         
@@ -107,7 +119,7 @@ def main():
         if current_state == State.IDLE:
             display_menu(frame, menu_idle)
         
-
+        
         # DETECT STATE (runs in both DETECT and MEASURE states)
         elif current_state == State.DETECT or current_state == State.MEASURE:
             
@@ -153,7 +165,14 @@ def main():
                     if roi_means is not None:
                         mean_r, mean_g, mean_b = roi_means
                         # Print for debugging
-                        # print(f"POLY:\n\tMean R: {mean_r}, Mean G: {mean_g}, Mean B: {mean_b}")
+                        # print(f"POLY:\n\tMean R: {mean_r}, Mean G: {mean_g}, Mean B: {mean_b}, Time: {time.time()}")
+
+                        # add frame to ICA estimator
+                        ica_estimator.add_frame(mean_r, mean_g, mean_b, time.time())
+
+                        if ica_estimator.length() >= ica_estimator.capture_window/2:
+                            print("Estimating BPM...")
+                            ica_estimator.estimate()
 
                     # TODO: estimate BPM 
 
