@@ -104,14 +104,16 @@ def main():
                 print("State: MEASURE")
 
         elif key == ord('q'): # QUIT
-            if ica_estimator.captures:
-                for i, capture in enumerate(ica_estimator.captures):
-                    if i == 0:
-                        print(f"Frame {i}: {capture.time:.3f}s (first frame)")
-                    else:
-                        time_diff = capture.time - ica_estimator.captures[i-1].time
-                        print(f"Frame {i}: {capture.time:.3f}s (diff: {time_diff:.3f}s)")
-                break
+            # if ica_estimator.captures:
+            #     for i, capture in enumerate(ica_estimator.captures):
+            #         if i == 0:
+            #             print(f"Frame {i}: {capture.time:.3f}s (first frame)")
+            #         else:
+            #             time_diff = capture.time - ica_estimator.captures[i-1].time
+            #             print(f"Frame {i}: {capture.time:.3f}s (diff: {time_diff:.3f}s)")
+            
+            # ica_estimator.plot_channels()
+            break
 
         # --- STATE MACHINE ---
         
@@ -170,9 +172,11 @@ def main():
                         # add frame to ICA estimator
                         ica_estimator.add_frame(mean_r, mean_g, mean_b, time.time())
 
-                        if ica_estimator.length() >= ica_estimator.capture_window/2:
+                        if ica_estimator.length() >= ica_estimator.capture_window/2 and ica_estimator.length() % 20 == 0:
                             print("Estimating BPM...")
+                            start = time.time()
                             ica_estimator.estimate()
+                            print(f"Estimation took {time.time() - start:.3f} seconds.")
 
                     # TODO: estimate BPM 
 
