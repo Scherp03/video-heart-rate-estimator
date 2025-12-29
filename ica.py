@@ -2,7 +2,10 @@ from sklearn.decomposition import FastICA
 import numpy as np
 import time
 from scipy.fft import fft, fftfreq
+from scipy.signal import butter, filtfilt, find_peaks
 import matplotlib.pyplot as plt
+from sklearn.exceptions import ConvergenceWarning
+import warnings
 
 class Capture:
     def __init__(self, r = None, g = None, b = None, time = None):
@@ -10,21 +13,22 @@ class Capture:
         self.green = g
         self.blue = b
         self.time = time
-        
-        
+
 
 class Estimator:
     def __init__(self, start_time = None):
-        self.capture_window = 300  # number of frames to consider
+        self.capture_window = 200  # number of frames to consider
         self.captures = []
         self.start_time = start_time
         self.ica_channels = None
+        self.ica_converged = None
 
     def add_frame(self, r, g, b, time):
         if r is not None and g is not None and b is not None:
             if len(self.captures) >= self.capture_window:
                 print("Removing oldest capture")
-                self.captures.pop(0)  # remove oldest capture
+                # self.captures = self.captures[20:]  # remove oldest 20 captures
+                self.captures = []
             
             self.captures.append(Capture(r, g, b, time - self.start_time))
             print(f"Added capture: R={r}, G={g}, B={b}, Time={time - self.start_time if self.start_time else time}")
@@ -34,14 +38,36 @@ class Estimator:
         return len(self.captures)
 
     def estimate(self):
-        if len(self.captures) < self.capture_window / 2:
+        if len(self.captures) < self.capture_window:
             print("Not enough data to estimate BPM.")
             return None
 
         # Run ICA (output shape: n_samples, n_components)
         ica = FastICA(n_components=3, max_iter=100)
         rgb_channels = np.array([[cap.red, cap.green, cap.blue] for cap in self.captures])
-        ica_channels = ica.fit_transform(rgb_channels)
+        try:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always', ConvergenceWarning)
+                ica_channels = ica.fit_transform(rgb_channels)
+
+                # check for convergence warnings, sometimes it does not converge and the results are not valid
+                conv_warnings = [warn for warn in w if issubclass(warn.category, ConvergenceWarning)]
+                if conv_warnings:
+                    print("Warning: FastICA did not converge within max_iter. Consider increasing max_iter.")
+                    self.ica_converged = False
+                else:
+                    self.ica_converged = True
+        except Exception as e:
+            print(f"ICA fitting failed with exception: {e}")
+            self.ica_converged = False
+            return None
+
+        # Check for NaNs in the ICA output just in case
+        if np.isnan(ica_channels).any():
+            print("ICA transformation produced NaNs.")
+            self.ica_converged = False
+            return None
+        
         self.ica_channels = ica_channels  # keep samples x components
         n_samples, n_components = self.ica_channels.shape
         print("total channels: ", n_components)
@@ -65,6 +91,8 @@ class Estimator:
         for i in range(n_components):
             channel = self.ica_channels[:, i].astype(float)
             channel = channel - np.mean(channel)            # remove DC
+            b, a = butter(2, [fmin_hz / (0.5 * fs), fmax_hz / (0.5 * fs)], btype='band')
+            channel = filtfilt(b, a, channel)
             windowed = channel * np.hamming(n_samples)     # reduce leakage
 
             Y = fft(windowed)
@@ -78,6 +106,12 @@ class Estimator:
 
             band_mag = mag[band_mask]
             band_freqs_bpm = freqs_bpm[band_mask]
+
+            peaks, peaks_dict = find_peaks(band_mag, height=(None, None), prominence=(None, None), width=(None, None), plateau_size=(None, None))
+            print(f"Channel {i} peaks at BPMs: {band_freqs_bpm[peaks]} with magnitudes: {band_mag[peaks]}")
+            print(f"Channel {i} peak prominence: {peaks_dict.get('prominences')}")
+
+            
 
             peak_idx = np.argmax(band_mag)
             peak_bpm = band_freqs_bpm[peak_idx]

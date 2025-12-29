@@ -22,9 +22,54 @@ def display_menu(frame, lines):
         cv2.putText(frame, line, (x0, temp_y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 200), 2)
 
 
+def list_available_cameras(max_index=8):
+    """Probe camera indices 0..max_index and return a list of available indices."""
+    available = []
+    for i in range(0, max_index + 1):
+        cap = cv2.VideoCapture(i)
+        if not cap.isOpened():
+            cap.release()
+            continue
+        # try to grab a frame to be more certain the device works
+        ret, _ = cap.read()
+        if ret:
+            available.append(i)
+        cap.release()
+    return available
+
+
+def choose_camera():
+    """Prompt the user to choose one of the detected cameras. Returns the chosen index."""
+    available = list_available_cameras(8)
+    if not available:
+        print("No cameras detected. Defaulting to index 0.")
+        return 0
+    if len(available) == 1:
+        print(f"Found one camera at index {available[0]}. Using it.")
+        return available[0]
+
+    print("Available cameras:")
+    for i in available:
+        print(f"  [{i}] Camera {i}")
+
+    while True:
+        try:
+            choice = input(f"Select camera index from {available} (press Enter to use {available[0]}): ")
+        except KeyboardInterrupt:
+            print("\nAborted by user. Exiting.")
+            exit(0)
+
+        if choice.strip() == "":
+            return available[0]
+        if choice.isdigit() and int(choice) in available:
+            return int(choice)
+        print("Invalid selection, try again.")
+
+
 def main():
-    # webcam initialization
-    cap = cv2.VideoCapture(0)
+    # webcam initialization (choose from available cameras)
+    cam_idx = choose_camera()
+    cap = cv2.VideoCapture(cam_idx)
 
     # face detector and estimator initialization
     detector = dt.RegionDetector()
@@ -172,7 +217,7 @@ def main():
                         # add frame to ICA estimator
                         ica_estimator.add_frame(mean_r, mean_g, mean_b, time.time())
 
-                        if ica_estimator.length() >= ica_estimator.capture_window/2 and ica_estimator.length() % 20 == 0:
+                        if ica_estimator.length() >= ica_estimator.capture_window:
                             print("Estimating BPM...")
                             start = time.time()
                             ica_estimator.estimate()
