@@ -22,6 +22,7 @@ class Estimator:
         self.start_time = start_time
         self.ica_channels = None
         self.ica_converged = None
+        self.estimations = []
 
     def add_frame(self, r, g, b, time):
         if r is not None and g is not None and b is not None:
@@ -111,12 +112,21 @@ class Estimator:
             print(f"Channel {i} peaks at BPMs: {band_freqs_bpm[peaks]} with magnitudes: {band_mag[peaks]}")
             print(f"Channel {i} peak prominence: {peaks_dict.get('prominences')}")
 
-            
+            # compute relative power of each peak (relative to total band power)
+            total_band_power = np.sum(band_mag)
+            if total_band_power <= 0:
+                print(f"Channel {i}: non-positive total band power.")
+                continue
 
-            peak_idx = np.argmax(band_mag)
-            peak_bpm = band_freqs_bpm[peak_idx]
-            bpm_estimates.append(peak_bpm)
-            print(f"Channel {i} peak: {peak_bpm:.1f} BPM")
+            peak_rel_power = band_mag[peaks] / total_band_power
+            # pick the single peak with maximum relative power for this channel
+            max_idx = int(np.argmax(peak_rel_power))
+            peak_bpm = float(band_freqs_bpm[peaks[max_idx]])
+            rel_power = float(peak_rel_power[max_idx])
+
+            bpm_estimates.append((peak_bpm, rel_power))
+            print(f"Channel {i} selected peak: {peak_bpm:.1f} BPM with rel power {rel_power:.3f}")
+
 
             # save FFT plot with BPM axis
             plt.figure()
@@ -132,8 +142,10 @@ class Estimator:
             print("No BPM estimates found.")
             return None
 
-        bpm = float(np.median(bpm_estimates))
-        print(f"Estimated BPM (median): {bpm:.1f}")
+        # choose the frequency from the channel whose selected peak has the highest relative power
+        best = max(bpm_estimates, key=lambda t: t[1])
+        bpm = float(best[0])
+        print(f"Estimated BPM (best channel): {bpm:.1f} (rel power {best[1]:.3f})")
         return bpm
 
     def plot_channels(self):
