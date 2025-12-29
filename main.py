@@ -23,7 +23,6 @@ def display_menu(frame, lines):
 
 
 def list_available_cameras(max_index=8):
-    """Probe camera indices 0..max_index and return a list of available indices."""
     available = []
     for i in range(0, max_index + 1):
         cap = cv2.VideoCapture(i)
@@ -39,7 +38,6 @@ def list_available_cameras(max_index=8):
 
 
 def choose_camera():
-    """Prompt the user to choose one of the detected cameras. Returns the chosen index."""
     available = list_available_cameras(8)
     if not available:
         print("No cameras detected. Defaulting to index 0.")
@@ -70,6 +68,12 @@ def main():
     # webcam initialization (choose from available cameras)
     cam_idx = choose_camera()
     cap = cv2.VideoCapture(cam_idx)
+
+    try:
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25) 
+        cap.set(cv2.CAP_PROP_EXPOSURE, -5.0) 
+    except Exception as e:
+        print("Could not set manual exposure:", e)
 
     # face detector and estimator initialization
     detector = dt.RegionDetector()
@@ -110,6 +114,7 @@ def main():
 
     # ICA Estimator
     ica_estimator = ica.Estimator(time.time())
+    last_bpm_display = "Measuring..."
 
     while True:
         ret, initial_frame = cap.read()
@@ -220,13 +225,17 @@ def main():
                         if ica_estimator.length() >= ica_estimator.capture_window:
                             print("Estimating BPM...")
                             start = time.time()
-                            ica_estimator.estimate()
+                            bpm = ica_estimator.estimate()
                             print(f"Estimation took {time.time() - start:.3f} seconds.")
+                            if bpm is not None:
+                                last_bpm_display = f"BPM: {bpm:.1f}"
+                                print(f"Current Estimate: {bpm:.1f}")
 
-                    # TODO: estimate BPM 
-
-                    # cv2.putText(frame, bpm_display, (x, y), 
-                    #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        # Draw the BPM on screen
+                        x, y = detector.get_head_coords(frame)
+                        if x is not None and y is not None:
+                            cv2.putText(frame, last_bpm_display, (x - 80, y - 150), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
+            
                     pass
                 
         # show the final frame

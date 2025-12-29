@@ -64,6 +64,20 @@ class RegionDetector:
             points.append([x, y])
 
         return np.array(points)
+
+    def get_head_coords(self, frame):
+        if not self.landmark_results or not self.landmark_results.multi_face_landmarks:
+            return None
+        
+        face_landmarks = self.landmark_results.multi_face_landmarks[0]
+        height, width, _ = frame.shape
+
+        index = 10
+    
+        x = int(face_landmarks.landmark[index].x * width)
+        y = int(face_landmarks.landmark[index].y * height)
+
+        return (x, y)
     
 def extract_roi_means(frame, points):
     # mask for the forehead region polygon
