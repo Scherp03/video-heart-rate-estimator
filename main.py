@@ -2,7 +2,7 @@ import time
 import cv2
 import numpy as np
 import detection as dt
-import ica
+import estimation
 
 # STATES 
 class State:
@@ -113,7 +113,7 @@ def main():
     ]
 
     # ICA Estimator
-    ica_estimator = ica.Estimator(time.time())
+    ica_estimator = estimation.Estimator(time.time())
     last_bpm_display = "Measuring..."
 
     while True:
