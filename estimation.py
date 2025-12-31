@@ -19,7 +19,7 @@ class Capture:
 
 class Estimator:
     def __init__(self, start_time = None):
-        self.capture_window = 90  # number of frames to consider
+        self.capture_window = 150  # number of frames to consider
         self.captures = []
         self.start_time = start_time
         self.ica_channels = None
@@ -30,8 +30,7 @@ class Estimator:
         if r is not None and g is not None and b is not None:
             if len(self.captures) >= self.capture_window:
                 print("Removing oldest capture")
-                # self.captures = self.captures[20:]  # remove oldest 20 captures
-                self.captures = []
+                self.captures = self.captures[20:]  # remove oldest 20 captures
             
             self.captures.append(Capture(r, g, b, time - self.start_time))
             print(f"Added capture: R={r}, G={g}, B={b}, Time={time - self.start_time if self.start_time else time}")
