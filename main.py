@@ -1,6 +1,5 @@
 import time
 import cv2
-import numpy as np
 import detection as dt
 import estimation
 
@@ -121,11 +120,12 @@ def main():
 
         if key == ord('n'): # NULL STATE
             current_state = State.IDLE
+            last_bpm_display = "Measuring..."
             print("State: IDLE")
 
         elif key == ord('d'): # DETECT STATE
             current_state = State.DETECT
-
+            last_bpm_display = "Measuring..."
             print("State: DETECT")
 
         elif key == ord('m'): # MEASURE STATE
@@ -136,6 +136,7 @@ def main():
             else:
                 current_state = State.MEASURE
                 estimator.captures = []  # reset captures
+                estimator.estimations = [] # reset estimations history
                 estimator.start_time = time.time()
                 print("State: MEASURE")
         
@@ -144,7 +145,9 @@ def main():
                     print("Error: Must detect face first! Press 'd' to detect face.")
             else:
                 estimator.captures = []  # reset captures
+                estimator.estimations = [] # reset estimations history
                 estimator.start_time = time.time()
+                last_bpm_display = "Measuring..."
                 print("Restarting measurement...")
                 print("State: MEASURE")
 
@@ -204,8 +207,9 @@ def main():
                                 print(f"Current Estimate: {bpm:.0f}")
 
                         # Draw the BPM on screen over the top of the head
-                        x, y = detector.get_top_head_coords(frame)
-                        if x is not None and y is not None:
+                        top_head_coords = detector.get_top_head_coords(frame)
+                        if top_head_coords is not None:
+                            x, y = top_head_coords
                             cv2.putText(frame, last_bpm_display, (x - 80, y - 150), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)                   
                 
         # show the final frame

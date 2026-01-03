@@ -129,4 +129,4 @@ def draw_face_features(frame, features):
             # draw contours in red
             cv2.polylines(frame, [points], isClosed=True, color=(0, 0, 255), thickness=2)
             # optional: fill features in black
-            cv2.fillPoly(frame, [points], (0, 0, 0))
+            # cv2.fillPoly(frame, [points], (0, 0, 0))
