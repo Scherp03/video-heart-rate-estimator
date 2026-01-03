@@ -5,18 +5,12 @@ from scipy.fft import rfft, rfftfreq
 from scipy.signal import butter, filtfilt, find_peaks
 import matplotlib.pyplot as plt
 
-class Capture:
-    def __init__(self, r = None, g = None, b = None, time = None):
-        self.red = r
-        self.green = g
-        self.blue = b
-        self.time = time
-
-
 class Estimator:
     def __init__(self, start_time = None):
         self.capture_window = 300  # number of frames to consider
-        self.captures = []
+        self.sliding_window_size = 10  # number of frames to remove when exceeding capture window
+        
+        self.captures = []  # r, g, b, time
         self.start_time = start_time
         self.estimations = []
 
@@ -24,14 +18,14 @@ class Estimator:
         if r is not None and g is not None and b is not None:
             if len(self.captures) >= self.capture_window:
                 print("Removing oldest capture")
-                self.captures = self.captures[10:]  # remove oldest 10 captures
+                self.captures = self.captures[self.sliding_window_size:]  # remove oldest 10 captures
             
-            self.captures.append(Capture(r, g, b, time - self.start_time))
+            self.captures.append((r, g, b, time - self.start_time))
             print(f"Added capture: R={r}, G={g}, B={b}, Time={time - self.start_time if self.start_time else time}")
         
     def length(self):
-        print(f"Length of captures: {len(self.captures)}")
-        return len(self.captures)
+        print(f"Length of captures: {len(self.captures) if self.captures else 0}")
+        return len(self.captures) if self.captures else 0
 
     def estimate(self):
         if len(self.captures) < self.capture_window:
@@ -39,7 +33,7 @@ class Estimator:
             return None
 
         # unpack and normalize
-        red, green, blue = np.array([[cap.red, cap.green, cap.blue] for cap in self.captures]).T
+        red, green, blue, times = np.array(self.captures).T
         
         # implementation of POS algorithm described in the fllowing paper:
         # https://pure.tue.nl/ws/files/31563684/TBME_00467_2016_R1_preprint.pdf
@@ -65,7 +59,7 @@ class Estimator:
 
         # interpolation (resample to 30 Hz uniformly)
         # we want to map the jittery camera frames to a perfect 30Hz timeline
-        raw_times = np.array([cap.time for cap in self.captures])
+        raw_times = np.array([t for t in times])
             
         # target sampling frequency 
         fs = 30.0 
