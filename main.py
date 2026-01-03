@@ -135,26 +135,20 @@ def main():
                 print("Error: Must detect face first! Press 'd' to detect face.")
             else:
                 current_state = State.MEASURE
+                estimator.captures = []  # reset captures
+                estimator.start_time = time.time()
                 print("State: MEASURE")
         
         elif key == ord('r'): # MEASURE STATE (RESTART)  
             if current_state != State.MEASURE:
                     print("Error: Must detect face first! Press 'd' to detect face.")
             else:
-                # TODO: reset any variables and restart measurement
+                estimator.captures = []  # reset captures
+                estimator.start_time = time.time()
                 print("Restarting measurement...")
                 print("State: MEASURE")
 
         elif key == ord('q'): # QUIT
-            # if estimator.captures:
-            #     for i, capture in enumerate(estimator.captures):
-            #         if i == 0:
-            #             print(f"Frame {i}: {capture.time:.3f}s (first frame)")
-            #         else:
-            #             time_diff = capture.time - estimator.captures[i-1].time
-            #             print(f"Frame {i}: {capture.time:.3f}s (diff: {time_diff:.3f}s)")
-            
-            # estimator.plot_channels()
             break
 
         # --- STATE MACHINE ---
@@ -206,8 +200,8 @@ def main():
                             bpm = estimator.estimate()
                             print(f"Estimation took {time.time() - start:.3f} seconds.")
                             if bpm is not None:
-                                last_bpm_display = f"BPM: {bpm:.1f}"
-                                print(f"Current Estimate: {bpm:.1f}")
+                                last_bpm_display = f"BPM: {bpm:.0f}"
+                                print(f"Current Estimate: {bpm:.0f}")
 
                         # Draw the BPM on screen over the top of the head
                         x, y = detector.get_top_head_coords(frame)
