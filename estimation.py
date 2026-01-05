@@ -21,10 +21,12 @@ class Estimator:
                 self.captures = self.captures[self.sliding_window_size:]  # remove oldest 10 captures
             
             self.captures.append((r, g, b, time - self.start_time))
-            print(f"Added capture: R={r}, G={g}, B={b}, Time={time - self.start_time if self.start_time else time}")
+
+            # Debugging print
+            # print(f"Added capture: R={r}, G={g}, B={b}, Time={time - self.start_time if self.start_time else time}")
         
     def length(self):
-        print(f"Length of captures: {len(self.captures) if self.captures else 0}")
+        # print(f"Length of capturess: {len(self.captures) if self.captures else 0}") if len(self.captures) % 50 == 0 else None
         return len(self.captures) if self.captures else 0
 
     def estimate(self):
@@ -53,10 +55,6 @@ class Estimator:
         
         raw_signal = s1 + alpha * s2
 
-        # S = s1 + alpha * s2
-        # fs = len(self.captures) / (self.captures[-1].time - self.captures[0].time)  # sampling frequency
-        # print(f"Sampling frequency: {fs:.2f} Hz")
-
         # interpolation (resample to 30 Hz uniformly)
         # we want to map the jittery camera frames to a perfect 30Hz timeline
         raw_times = np.array([t for t in times])
@@ -68,11 +66,6 @@ class Estimator:
         # interpolate the POS signal onto this grid
         interpolator = interpolate.interp1d(raw_times, raw_signal, kind='cubic', fill_value="extrapolate")
         S = interpolator(uniform_times)
-        
-        # detrend to remove slow drift (DC offset/light changes)
-        # S = detrend(S)
-        
-        # n_samples = len(S)
 
         # bandpass filter, from 0.7 Hz to 3 Hz (42-180 BPM)
         fmin_hz, fmax_hz = 0.7, 3  
@@ -117,7 +110,9 @@ class Estimator:
         if len(self.estimations) > 7:
             self.estimations = self.estimations[-7:]  
 
-        smoothed_bpm = np.mean(self.estimations)  
+        # smooth the estimates using weighted average
+        weights = np.linspace(1, len(self.estimations), len(self.estimations))
+        smoothed_bpm = np.average(self.estimations, weights=weights) 
 
         # save FFT plot with BPM axis
         plt.figure()

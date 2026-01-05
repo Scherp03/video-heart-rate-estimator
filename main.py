@@ -191,12 +191,13 @@ def main():
                 
                     if roi_means is not None:
                         mean_r, mean_g, mean_b = roi_means
-                        # Print for debugging
-                        # print(f"POLY:\n\tMean R: {mean_r}, Mean G: {mean_g}, Mean B: {mean_b}, Time: {time.time()}")
 
                         # add frame to estimator
                         estimator.add_frame(mean_r, mean_g, mean_b, time.time())
 
+                        if last_bpm_display.startswith("Measuring"):
+                            last_bpm_display = f"Measuring... ({(estimator.length()/estimator.capture_window)*100:.0f}%)"
+                        
                         if estimator.length() >= estimator.capture_window:
                             print("Estimating BPM...")
                             start = time.time()
@@ -204,8 +205,8 @@ def main():
                             print(f"Estimation took {time.time() - start:.3f} seconds.")
                             if bpm is not None:
                                 last_bpm_display = f"BPM: {bpm:.0f}"
-                                print(f"Current Estimate: {bpm:.0f}")
-
+                                print(f"Current Estimate: {bpm:.0f}\n")
+                        
                         # Draw the BPM on screen over the top of the head
                         top_head_coords = detector.get_top_head_coords(frame)
                         if top_head_coords is not None:
