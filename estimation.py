@@ -94,7 +94,7 @@ class Estimator:
         band_freqs = freqs_bpm[band_mask]
 
         # find peaks in the specific band
-        peaks, properties = find_peaks(band_mag, height=0)
+        peaks, _ = find_peaks(band_mag, height=0)
         
         if len(peaks) == 0:
             return 0.0

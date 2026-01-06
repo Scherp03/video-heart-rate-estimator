@@ -192,16 +192,22 @@ def main():
                     if roi_means is not None:
                         mean_r, mean_g, mean_b = roi_means
 
+                        # variable for displaying measurement progress
+                        waiting_measurement = None
+
                         # add frame to estimator
                         estimator.add_frame(mean_r, mean_g, mean_b, time.time())
 
                         if last_bpm_display.startswith("Measuring"):
+                            waiting_measurement = True
                             last_bpm_display = f"Measuring... ({(estimator.length()/estimator.capture_window)*100:.0f}%)"
+
                         
                         if estimator.length() >= estimator.capture_window:
                             print("Estimating BPM...")
                             start = time.time()
                             bpm = estimator.estimate()
+                            waiting_measurement = False
                             print(f"Estimation took {time.time() - start:.3f} seconds.")
                             if bpm is not None:
                                 last_bpm_display = f"BPM: {bpm:.0f}"
@@ -211,7 +217,10 @@ def main():
                         top_head_coords = detector.get_top_head_coords(frame)
                         if top_head_coords is not None:
                             x, y = top_head_coords
-                            cv2.putText(frame, last_bpm_display, (x - 80, y - 150), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)                   
+                            if waiting_measurement is True:
+                                cv2.putText(frame, last_bpm_display, (x - 143, y - 110), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3) 
+                            else:
+                                cv2.putText(frame, last_bpm_display, (x - 70, y - 110), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)                  
                 
         # show the final frame
         cv2.imshow("BPM ESTIMATOR", frame)
