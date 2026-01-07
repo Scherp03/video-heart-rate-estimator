@@ -88,3 +88,21 @@ Once the environment is active (you should see `(venv)` in your prompt), install
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+---
+
+### 4. Run the project
+
+**Make sure you have a working webcam or an external camera connected**
+
+From the project root, run the following command:
+
+**Linux / macOS**
+```bash
+python3 main.py
+```
+
+**Windows**
+```bash
+python main.py
+```
