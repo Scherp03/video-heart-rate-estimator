@@ -2,9 +2,7 @@
 venv/
 __pycache__
 
+old_detection/
 
-# DNN
-.venv_dnn/
-/models/
-detection_dnn.py
-requirements_dnn.txt
+*.png
+

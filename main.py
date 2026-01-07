@@ -1,6 +1,7 @@
+import time
 import cv2
-import numpy as np
 import detection as dt
+import estimation
 
 # STATES 
 class State:
@@ -15,23 +16,69 @@ def display_menu(frame, lines):
     for i, line in enumerate(lines):
         temp_y = y0 + i * dy
         # background rectangle for better visibility
-        cv2.rectangle(frame, (x0 - 10, temp_y - 30), (x0 + 560, temp_y + 15), (0, 0, 0), -1)
+        cv2.rectangle(frame, (x0 - 10, temp_y - 30), (x0 + 480, temp_y + 15), (0, 0, 0), -1)
         # actual text
-        cv2.putText(frame, line, (x0, temp_y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 200), 2)
+        cv2.putText(frame, line, (x0, temp_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 200), 2)
+
+# function to list available camera indices
+def list_available_cameras(max_index=8):
+    available = []
+    for i in range(0, max_index + 1):
+        cap = cv2.VideoCapture(i)
+        if not cap.isOpened():
+            cap.release()
+            continue
+        # try to grab a frame to be more certain the device works
+        ret, _ = cap.read()
+        if ret:
+            available.append(i)
+        cap.release()
+    return available
+
+# choose camera from available devices
+def choose_camera():
+    available = list_available_cameras(8)
+    if not available:
+        print("No cameras detected. Defaulting to index 0.")
+        return 0
+    if len(available) == 1:
+        print(f"Found one camera at index {available[0]}. Using it.")
+        return available[0]
+
+    print("Available cameras:")
+    for i in available:
+        print(f"  [{i}] Camera {i}")
+
+    while True:
+        try:
+            choice = input(f"Select camera index from {available} (press Enter to use {available[0]}): ")
+        except KeyboardInterrupt:
+            print("\nAborted by user. Exiting.")
+            exit(0)
+
+        if choice.strip() == "":
+            return available[0]
+        if choice.isdigit() and int(choice) in available:
+            return int(choice)
+        print("Invalid selection, try again.")
 
 
 def main():
-    # webcam initialization
-    cap = cv2.VideoCapture(0)
+    # webcam initialization (choose from available cameras)
+    cam_idx = choose_camera()
+    cap = cv2.VideoCapture(cam_idx)
 
-    # face detector and estimator initialization
+    # face detector initialization
     detector = dt.RegionDetector()
+
+    # bpm estimator initialization
+    estimator = estimation.Estimator(time.time())
+
+    # variable to hold last bpm display string
+    last_bpm_display = "Measuring..."
     
     # start in IDLE state
     current_state = State.IDLE
-
-    # initialize selected region
-    selected_region_id = None
     
     print("BPM ESTIMATOR - READY")
     print("Press 'q' to quit")
@@ -45,26 +92,25 @@ def main():
     
     menu_detect = [
         "DETECTING FACE...",
-        " - Press 'n' to resturn to idle state",
+        " - Press 'n' to return to idle state",
         " - Press 'q' to quit",
-        "SELECT THE CLEAREST REGION:",
-        " - Press '1' for Left Cheek",
-        " - Press '2' for Right Cheek",
-        " - Press '3' for Forehead"
+        " - Press 'm' to start bpm measurement"
     ]
     
     menu_measure = [
-        "MEASURING HEARTBEAT...",
+        "MEASURING HEARTBEAT... STAY STILL!",
         " - Press 'r' to restart bpm measurement",
-        " - Press 'd' to restart Forehead detection",
-        " - Press 'n' to resturn to idle state",
+        " - Press 'd' to restart face detection",
+        " - Press 'n' to return to idle state",
         " - Press 'q' to quit"
     ]
 
     while True:
+        # capture frame from webcam
         ret, initial_frame = cap.read()
         if not ret: break
 
+        # flip frame for mirror effect (can be removed if not desired)
         frame = cv2.flip(initial_frame, 1)
 
         # KEYBOARD CONTROLS
@@ -72,29 +118,35 @@ def main():
 
         if key == ord('n'): # NULL STATE
             current_state = State.IDLE
+            last_bpm_display = "Measuring..."
             print("State: IDLE")
 
         elif key == ord('d'): # DETECT STATE
             current_state = State.DETECT
-
+            last_bpm_display = "Measuring..."
             print("State: DETECT")
 
-        elif key in [ord('1'), ord('2'), ord('3')]: # MEASURE STATE
+        elif key == ord('m'): # MEASURE STATE
             if current_state == State.MEASURE:
-                print("Error: Already in MEASURE state!")             
+                print("Warning: Already in MEASURE state!")             
             elif current_state == State.IDLE:
-                print("Error: Must detect forehead first! Press 'd'.")
+                print("Error: Must detect face first! Press 'd' to detect face.")
             else:
-                selected_region_id = int(chr(key)) # convert key input to int
+                # actually switch to MEASURE state
                 current_state = State.MEASURE
-                print(f"Selected Region ID: {selected_region_id}")
+                estimator.captures = []  # reset captures
+                estimator.estimations = [] # reset estimations history
+                estimator.start_time = time.time()
                 print("State: MEASURE")
         
         elif key == ord('r'): # MEASURE STATE (RESTART)  
             if current_state != State.MEASURE:
-                    print("Error: Region not selected! Press '1', '2', or '3' to select region.")
+                    print("Error: Must detect face first! Press 'd' to detect face.")
             else:
-                # TODO: reset any variables and restart measurement
+                estimator.captures = []  # reset captures
+                estimator.estimations = [] # reset estimations history
+                estimator.start_time = time.time()
+                last_bpm_display = "Measuring..."
                 print("Restarting measurement...")
                 print("State: MEASURE")
 
@@ -107,7 +159,6 @@ def main():
         if current_state == State.IDLE:
             display_menu(frame, menu_idle)
         
-
         # DETECT STATE (runs in both DETECT and MEASURE states)
         elif current_state == State.DETECT or current_state == State.MEASURE:
             
@@ -119,47 +170,55 @@ def main():
 
             # run the face detection and forehead extraction
             detector.detect_face(frame)
+
             # optionally draw the face mesh
             # detector.draw_face_mesh(frame)
 
-            # get region points for left cheek (1), right cheek (2), and forehead (3)
-            left_cheek_points = detector.get_region_coords(frame, 1)
-            right_cheek_points = detector.get_region_coords(frame, 2)
-            forehead_points = detector.get_region_coords(frame, 3)
+            # get feature coordinates for the face
+            features_coords = detector.get_all_feature_coords(frame)
 
-            if forehead_points is not None and left_cheek_points is not None and right_cheek_points is not None:
-                # draw the forehead and left and right cheek polygons
-                cv2.polylines(frame, [forehead_points], isClosed=True, color=(0, 0, 255), thickness=2)
-                cv2.polylines(frame, [left_cheek_points], isClosed=True, color=(0, 0, 255), thickness=2)
-                cv2.polylines(frame, [right_cheek_points], isClosed=True, color=(0, 0, 255), thickness=2)
-
+            if features_coords is not None:
+                # draw the the detected features
+                dt.draw_face_features(frame, features_coords)
                 # MEASURE STATE 
-                if current_state == State.MEASURE:  
-                    # select the desired region 
-                    if selected_region_id == 1:
-                        region_points = left_cheek_points
-                    elif selected_region_id == 2:
-                        region_points = right_cheek_points
-                    elif selected_region_id == 3: 
-                        region_points = forehead_points
-                    else:
-                        region_points = None
-
-                    cv2.polylines(frame, [region_points], isClosed=True, color=(0, 255, 0), thickness=2)
-
+                if current_state == State.MEASURE:      
                     # extract roi signal means
-                    roi_means = dt.extract_roi_means(frame, region_points)
+                    roi_means = dt.extract_means(frame, features_coords)
                 
                     if roi_means is not None:
+                        # unpack rgb means
                         mean_r, mean_g, mean_b = roi_means
-                        # Print for debugging
-                        # print(f"POLY:\n\tMean R: {mean_r}, Mean G: {mean_g}, Mean B: {mean_b}")
 
-                    # TODO: estimate BPM 
+                        # variable for displaying measurement progress
+                        waiting_measurement = None
 
-                    # cv2.putText(frame, bpm_display, (x, y), 
-                    #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    pass
+                        # add frame to estimator
+                        estimator.add_frame(mean_r, mean_g, mean_b, time.time())
+
+                        # update measurement display string
+                        if last_bpm_display.startswith("Measuring"):
+                            waiting_measurement = True
+                            last_bpm_display = f"Measuring... ({(estimator.length()/estimator.capture_window)*100:.0f}%)"
+
+                        # if enough data collected, perform estimation
+                        if estimator.length() >= estimator.capture_window:
+                            print("Estimating BPM...")
+                            start = time.time()
+                            bpm = estimator.estimate()
+                            waiting_measurement = False
+                            print(f"Estimation took {time.time() - start:.3f} seconds.")
+                            if bpm is not None:
+                                last_bpm_display = f"BPM: {bpm:.0f}"
+                                print(f"Current Estimate: {bpm:.0f}\n")
+                        
+                        # draw the BPM on screen over the top of the head
+                        top_head_coords = detector.get_top_head_coords(frame)
+                        if top_head_coords is not None:
+                            x, y = top_head_coords
+                            if waiting_measurement is True:
+                                cv2.putText(frame, last_bpm_display, (x - 143, y - 110), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3) 
+                            else:
+                                cv2.putText(frame, last_bpm_display, (x - 70, y - 110), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)                  
                 
         # show the final frame
         cv2.imshow("BPM ESTIMATOR", frame)
