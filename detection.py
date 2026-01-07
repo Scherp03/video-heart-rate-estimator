@@ -30,6 +30,7 @@ class RegionDetector:
 
     # detect the face and get landmarks
     def detect_face(self, frame):
+        # convert the BGR image to RGB before processing
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         self.landmark_results = self.face_mesh.process(frame_rgb)
     
@@ -45,15 +46,17 @@ class RegionDetector:
                     connection_drawing_spec=self.mp_drawing_styles.get_default_face_mesh_tesselation_style()
                 )
 
-    # convert list of indices to list of points (x,y) coords
+    # function to convert list of indices to list of (x,y) points coords
     def _get_coords_from_indices(self, frame, indices):
         if not self.landmark_results or not self.landmark_results.multi_face_landmarks:
             return None
         
+        # select the first detected face
         face_landmarks = self.landmark_results.multi_face_landmarks[0]
         height, width, _ = frame.shape
         points = []
 
+        # convert normalized landmarks to pixel coordinates
         for i in indices:
             pt = face_landmarks.landmark[i]
             x = int(pt.x * width)
@@ -73,14 +76,16 @@ class RegionDetector:
             "mouth": self._get_coords_from_indices(frame, self.MOUTH_INDICES)
         }
     
+    # get the coordinates of the top's middle of the head (used for displaying text)
     def get_top_head_coords(self, frame):
         if not self.landmark_results or not self.landmark_results.multi_face_landmarks:
             return None
         
+        # select the first detected face
         face_landmarks = self.landmark_results.multi_face_landmarks[0]
         height, width, _ = frame.shape
 
-        # index for the top of the forehead
+        # index for the top's middle of the forehead
         index = 10
     
         x = int(face_landmarks.landmark[index].x * width)
@@ -88,43 +93,45 @@ class RegionDetector:
 
         return (x, y)
     
+# spatial averaging to extract mean RGB values from the face region
 # create a binary mask for the face region excluding eyes, eyebrows, and mouth
 # face is white (255), excluded features are black (0)
 def extract_means(frame, features):
+    # get frame dimensions
     height, width = frame.shape[:2]
     
     # create an empty/black mask
     mask = np.zeros((height, width), dtype=np.uint8)
 
-    # draw the full face oval in white
+    # draw the full face in white
     if features["face_contour"] is not None:
         cv2.fillPoly(mask, [features["face_contour"]], 255)
 
     # draw features in black to "remove" them
     exclusion_keys = ["left_eye", "right_eye", "left_eyebrow", "right_eyebrow", "mouth"]
     for key in exclusion_keys:
-        points = features.get(key)
+        points = features[key]
         if points is not None:
             cv2.fillPoly(mask, [points], 0)
 
-    # calculate mean colors within the masked region (only where pixels are white/255)
+    # perform spatial averaging within the masked region (only where pixels are white/255)
     # mean function returns (b, g, r, alpha)
     mean_b, mean_g, mean_r, _ = cv2.mean(frame, mask=mask)
 
     # return means as RGB 
     return (mean_r, mean_g, mean_b)
 
-# draw the detected features on the frame for visualization
+# draw the detected features on the frame for visualization purposes
 def draw_face_features(frame, features): 
-    # draw the full face oval in green
+    # draw the full face contour in green
     if features["face_contour"] is not None:
         cv2.polylines(frame, [features["face_contour"]], isClosed=True, color=(0, 255, 0), thickness=2)
-        # optional: fill face contour in white
+        # optional: fill face in white
         # cv2.fillPoly(frame, [features["face_contour"]], (255, 255, 255))
 
     # draw features that will be removed in black 
     for key in ["left_eye", "right_eye", "left_eyebrow", "right_eyebrow", "mouth"]:
-        points = features.get(key)
+        points = features[key]
         if points is not None:
             # draw contours in red
             cv2.polylines(frame, [points], isClosed=True, color=(0, 0, 255), thickness=2)

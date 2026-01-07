@@ -20,7 +20,7 @@ def display_menu(frame, lines):
         # actual text
         cv2.putText(frame, line, (x0, temp_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 200), 2)
 
-
+# function to list available camera indices
 def list_available_cameras(max_index=8):
     available = []
     for i in range(0, max_index + 1):
@@ -35,7 +35,7 @@ def list_available_cameras(max_index=8):
         cap.release()
     return available
 
-
+# choose camera from available devices
 def choose_camera():
     available = list_available_cameras(8)
     if not available:
@@ -68,14 +68,14 @@ def main():
     cam_idx = choose_camera()
     cap = cv2.VideoCapture(cam_idx)
 
-    try:
-        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25) 
-        cap.set(cv2.CAP_PROP_EXPOSURE, -5.0) 
-    except Exception as e:
-        print("Could not set manual exposure:", e)
-
-    # face detector and estimator initialization
+    # face detector initialization
     detector = dt.RegionDetector()
+
+    # bpm estimator initialization
+    estimator = estimation.Estimator(time.time())
+
+    # variable to hold last bpm display string
+    last_bpm_display = "Measuring..."
     
     # start in IDLE state
     current_state = State.IDLE
@@ -105,14 +105,12 @@ def main():
         " - Press 'q' to quit"
     ]
 
-    # Estimator
-    estimator = estimation.Estimator(time.time())
-    last_bpm_display = "Measuring..."
-
     while True:
+        # capture frame from webcam
         ret, initial_frame = cap.read()
         if not ret: break
 
+        # flip frame for mirror effect (can be removed if not desired)
         frame = cv2.flip(initial_frame, 1)
 
         # KEYBOARD CONTROLS
@@ -134,6 +132,7 @@ def main():
             elif current_state == State.IDLE:
                 print("Error: Must detect face first! Press 'd' to detect face.")
             else:
+                # actually switch to MEASURE state
                 current_state = State.MEASURE
                 estimator.captures = []  # reset captures
                 estimator.estimations = [] # reset estimations history
@@ -160,7 +159,6 @@ def main():
         if current_state == State.IDLE:
             display_menu(frame, menu_idle)
         
-        
         # DETECT STATE (runs in both DETECT and MEASURE states)
         elif current_state == State.DETECT or current_state == State.MEASURE:
             
@@ -172,6 +170,7 @@ def main():
 
             # run the face detection and forehead extraction
             detector.detect_face(frame)
+
             # optionally draw the face mesh
             # detector.draw_face_mesh(frame)
 
@@ -179,17 +178,15 @@ def main():
             features_coords = detector.get_all_feature_coords(frame)
 
             if features_coords is not None:
-                # draw the forehead and left and right cheek polygons
+                # draw the the detected features
                 dt.draw_face_features(frame, features_coords)
                 # MEASURE STATE 
-                if current_state == State.MEASURE:  
-
-                    cv2.polylines(frame, [features_coords["face_contour"]], isClosed=True, color=(0, 255, 0), thickness=2)
-    
+                if current_state == State.MEASURE:      
                     # extract roi signal means
                     roi_means = dt.extract_means(frame, features_coords)
                 
                     if roi_means is not None:
+                        # unpack rgb means
                         mean_r, mean_g, mean_b = roi_means
 
                         # variable for displaying measurement progress
@@ -198,11 +195,12 @@ def main():
                         # add frame to estimator
                         estimator.add_frame(mean_r, mean_g, mean_b, time.time())
 
+                        # update measurement display string
                         if last_bpm_display.startswith("Measuring"):
                             waiting_measurement = True
                             last_bpm_display = f"Measuring... ({(estimator.length()/estimator.capture_window)*100:.0f}%)"
 
-                        
+                        # if enough data collected, perform estimation
                         if estimator.length() >= estimator.capture_window:
                             print("Estimating BPM...")
                             start = time.time()
@@ -213,7 +211,7 @@ def main():
                                 last_bpm_display = f"BPM: {bpm:.0f}"
                                 print(f"Current Estimate: {bpm:.0f}\n")
                         
-                        # Draw the BPM on screen over the top of the head
+                        # draw the BPM on screen over the top of the head
                         top_head_coords = detector.get_top_head_coords(frame)
                         if top_head_coords is not None:
                             x, y = top_head_coords

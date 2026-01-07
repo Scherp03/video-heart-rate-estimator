@@ -1,4 +1,3 @@
-from matplotlib.mlab import detrend
 from scipy import interpolate
 import numpy as np
 from scipy.fft import rfft, rfftfreq
