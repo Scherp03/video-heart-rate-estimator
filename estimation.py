@@ -18,15 +18,11 @@ class Estimator:
         if r is not None and g is not None and b is not None:
             if len(self.captures) >= self.capture_window:
                 print("Removing oldest capture")
-                self.captures = self.captures[self.sliding_window_size:]  # remove oldest 10 captures
+                self.captures = self.captures[self.sliding_window_size:]  # remove oldest captures
             
             self.captures.append((r, g, b, time - self.start_time))
-
-            # Debugging print
-            # print(f"Added capture: R={r}, G={g}, B={b}, Time={time - self.start_time if self.start_time else time}")
         
     def length(self):
-        # print(f"Length of capturess: {len(self.captures) if self.captures else 0}") if len(self.captures) % 50 == 0 else None
         return len(self.captures) if self.captures else 0
 
     def estimate(self):
@@ -84,7 +80,7 @@ class Estimator:
         freqs_bpm = freqs * 60.0
         mag = np.abs(Y)
 
-        # peak selection in the specific band 
+        # peak selection in the specific band
         band_mask = (freqs_bpm >= 42) & (freqs_bpm <= 180)
         
         if not np.any(band_mask):
